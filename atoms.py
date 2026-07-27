@@ -15,32 +15,32 @@
 import numpy as np
 import pandas as pd
 
-# open the file
-with open("10gs_ligand.mol2", "r") as file:
-    content = file.read()
+def count_atom():
+    # open the file
+    with open("10gs_ligand.mol2", "r") as file:
+        content = file.read()
 
-    found_atom = False
-    atom_lines = []
+        found_atom = False
+        atom_lines = []
 
-    for line in content.splitlines():
-        if found_atom:
-            # once we've passed the marker, start recording
-            if line.startswith("@<TRIPOS>"):
-                # stop if we hit the next section (e.g. @<TRIPOS>BOND)
-                break
-            atom_lines.append(line)
-        elif "@<TRIPOS>ATOM" in line:
-            found_atom = True
+        for line in content.splitlines():
+            if found_atom:
+                # once we've passed the marker, start recording
+                if line.startswith("@<TRIPOS>"):
+                    # stop if we hit the next section (e.g. @<TRIPOS>BOND)
+                    break
+                atom_lines.append(line)
+            elif "@<TRIPOS>ATOM" in line:
+                found_atom = True
 
-for line in atom_lines:
-    print(line)
-# while found_atom == true, collect info 
-# collect data from atom until bond
+    atom_types = []
 
-# locate the atom data
-# want data bw @<TRIPOS>ATOM and @<TRIPOS>BOND
-# have it start recording data once it passes @<TRIPOS>ATOM
-# Record entry for 6th column in a list
+    for line in atom_lines:
+        columns = line.split()  # splits on any whitespace, handles multiple spaces/tabs
+        if columns:  # skip empty lines
+            atom_types.append(columns[5])
 
+    print(atom_types)
 
 
+count_atom()
