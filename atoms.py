@@ -30,7 +30,8 @@ def parse_mol2(filepath):
         for line in atom_lines:
             columns = line.split() # split line on whitespace into list of columns
             if columns:  # skip empty lines
-                atom_types.add(columns[5])
+                if len(columns) > 5:    # skip lines with no atoms column
+                    atom_types.add(columns[5])
 
         # use RDkit to count rotatable bonds
         mol = Chem.MolFromMol2File(filepath)
@@ -73,7 +74,12 @@ def main():
 
     # collect info on the atom types and rotatable bonds in each ligand
     for file in files:
-        atom_types, n_rotatable = parse_mol2(file)
+        try:
+            atom_types, n_rotatable = parse_mol2(file)
+        except Exception as e:
+            failed_files.append((file, str(e)))
+            failed_to_parse_count += 18
+            continue
 
         # update count dicts with stats from the ligand
         for atom in atom_types:
@@ -92,25 +98,27 @@ def main():
     rot_bonds_csv_path = os.path.join(script_dir, "rot_bonds.csv")
     failed_files_csv_path = os.path.join(script_dir, "failed_files.csv")
 
+    # Save atoms to CSV, sorted by count (highest first)
     with open(atoms_csv_path, "w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        # Row 1: Keys
-        writer.writerow(atom_type_ligand_counts.keys())
-        # Row 2: Values
-        writer.writerow(atom_type_ligand_counts.values())
+        writer.writerow(["atom_type", "count"])
+        for atom_type, count in sorted(atom_type_ligand_counts.items(), key=lambda x: x[1], reverse=True):
+            writer.writerow([atom_type, count])
 
+    # Save rotatable bonds to CSV, sorted by count (highest first)
     with open(rot_bonds_csv_path, "w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerow(rotatable_bond_counts.keys())
-        writer.writerow(rotatable_bond_counts.values())
+        writer.writerow(["num_rotatable_bonds", "count"])
+        for num_bonds, count in sorted(rotatable_bond_counts.items(), key=lambda x: x[1], reverse=True):
+            writer.writerow([num_bonds, count])
 
-    # save failed files and final count to CSV
+    # Save failed files to CSV
     with open(failed_files_csv_path, "w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
+        writer.writerow(["failed_file"])
         for failed_file in failed_files:
             writer.writerow([failed_file])
-        writer.writerow(["failed_to_parse_count", failed_to_parse_count])
-
+        writer.writerow(["Total failed", failed_to_parse_count])
 # run the script
 if __name__ == "__main__":
     main()
