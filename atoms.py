@@ -41,6 +41,8 @@ def parse_mol2(filepath):
         else:
             n_rotatable = None
 
+        print(f"{filepath} parsed")
+
     return atom_types, n_rotatable
 
 
@@ -50,35 +52,44 @@ def parse_mol2(filepath):
 #     RETURN list of paths
 
 def find_ligand_files(root_folder):
+    print("COLLECTING FILE PATHS")
     ligand_paths = []
-
 
     for dirpath, dirnames, filenames in os.walk(root_folder):
         for fname in filenames:
             if fname.endswith("_ligand.mol2"):
                 ligand_paths.append(os.path.join(dirpath, fname))
+
     return ligand_paths
 
 
 
 def main():
+    TEST_MODE = False  # Change to False for full run
+
     script_dir = os.path.dirname(os.path.abspath(__file__))   # get absolute path to atoms.py folder
     root_folder = os.path.join(script_dir, "..", "PDBbind_Data")    # root folder is in atoms.py parent folder
 
     files = find_ligand_files(root_folder)   # collect files from PDBbind dataset
+
+    if TEST_MODE:
+        files = files[:20]
+        print(f"TEST MODE: Processing {len(files)} files")
 
     atom_type_ligand_counts = {}   # number of ligands with each atom type
     rotatable_bond_counts = {}  # number of ligands with each number of rotatable bonds
     failed_to_parse_count = 0
     failed_files = []
 
+    print("PROCESSING FILES")
     # collect info on the atom types and rotatable bonds in each ligand
     for file in files:
         try:
             atom_types, n_rotatable = parse_mol2(file)
         except Exception as e:
+            # keep track of how many files had some error beyond returning None
             failed_files.append((file, str(e)))
-            failed_to_parse_count += 18
+            failed_to_parse_count += 1
             continue
 
         # update count dicts with stats from the ligand
@@ -87,11 +98,13 @@ def main():
 
         # keep track of how many ligands failed to parse
         if n_rotatable is None:
-            failed_files.append(file)
+            failed_files.append((file, "RDKit returned None"))
             failed_to_parse_count += 1
             
         else:
             rotatable_bond_counts[n_rotatable] = rotatable_bond_counts.get(n_rotatable, 0) + 1
+
+    print("FILES PARSED: SAVING TO CSVs")
 
     # save the final dictionaries to CSVs for analysis
     atoms_csv_path = os.path.join(script_dir, "atoms.csv")
@@ -105,20 +118,21 @@ def main():
         for atom_type, count in sorted(atom_type_ligand_counts.items(), key=lambda x: x[1], reverse=True):
             writer.writerow([atom_type, count])
 
-    # Save rotatable bonds to CSV, sorted by count (highest first)
+    # Save rotatable bonds to CSV, sorted by num_bonds (lowest first)
     with open(rot_bonds_csv_path, "w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(["num_rotatable_bonds", "count"])
-        for num_bonds, count in sorted(rotatable_bond_counts.items(), key=lambda x: x[1], reverse=True):
+        for num_bonds, count in sorted(rotatable_bond_counts.items(), key=lambda x: x[0]):
             writer.writerow([num_bonds, count])
 
     # Save failed files to CSV
     with open(failed_files_csv_path, "w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerow(["failed_file"])
-        for failed_file in failed_files:
-            writer.writerow([failed_file])
+        writer.writerow(["filepath", "error_reason"])
+        for filepath, error_reason in failed_files:
+            writer.writerow([filepath, error_reason])
         writer.writerow(["Total failed", failed_to_parse_count])
+
 # run the script
 if __name__ == "__main__":
     main()
